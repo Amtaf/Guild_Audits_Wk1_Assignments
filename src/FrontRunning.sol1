@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: MIT
+
+/*
+Front running in the context of blockchain and smart contracts refers to the practice 
+where an entity (typically a miner or someone with privileged access) exploits advance 
+knowledge of pending transactions to gain an unfair advantage.
+*/
+pragma solidity ^0.7.6;
+pragma experimental ABIEncoderV2;
+
+import {Test, console} from "forge-std/Test.sol";
+import {PuppyRaffle} from "../src/PuppyRaffle.sol";
+
+contract PuppyRaffleFrontRunTest is Test {
+    PuppyRaffle raffle;
+
+    address owner = address(this);
+    address player1 = address(0x1);
+    address player2 = address(0x2);
+    address player3 = address(0x3);
+    address player4 = address(0x4);
+    address feeAddress = address(0x5);
+    uint256 entranceFee = 1 ether;
+    uint256 raffleDuration = 1 days;
+
+    function setUp() public {
+        raffle = new PuppyRaffle(entranceFee, feeAddress, raffleDuration);
+        vm.warp(block.timestamp + 1 hours); // Fast forward time to ensure raffle can start
+
+        // Fund player1 with enough ETH to enter the raffle
+        vm.deal(player1, 5 ether);
+    }
+
+    function testFrontRunning() public {
+        // Player 1, 2, 3, and 4 enter the raffle
+        address[] memory players = new address[](4);
+        players[0] = player1;
+        players[1] = player2;
+        players[2] = player3;
+        players[3] = player4;
+
+        vm.startPrank(player1);
+        raffle.enterRaffle{value: entranceFee * players.length}(players);
+        vm.stopPrank();
+
+        // Simulate fast-forwarding to just before the raffle ends
+        vm.warp(block.timestamp + raffleDuration - 1);
+
+        // Malicious player attempts to front-run the winner selection
+        vm.prank(player1);
+        raffle.refund(0);
+
+        // Ensure the player1 is not in the raffle anymore
+        uint256 player1Index = raffle.getActivePlayerIndex(player1);
+        assertEq(player1Index, 0);
+
+        // Fast forward to the end of the raffle
+        vm.warp(block.timestamp + 2);
+
+        // Select the winner
+        vm.prank(owner);
+        raffle.selectWinner();
+
+        // Ensure that the previousWinner is not player1
+        address previousWinner = raffle.previousWinner();
+        assert(previousWinner != player1);
+
+        // Log the previous winner for debugging purposes
+        console.log("Previous Winner: ", previousWinner);
+    }
+
+    receive() external payable {}
+}

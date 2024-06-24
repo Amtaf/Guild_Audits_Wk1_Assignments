@@ -2,7 +2,7 @@
 
 **Description:** 
 
-The `DSCEngine::_calculateHealthFactor` function which does wrong calculations for Healtfactor by performing divide operations before multiplication exposing the function and contract to a precision loss vulnerability,which could result to incorrect payouts where users mint DSC or insolvency.
+The `DSCEngine::_calculateHealthFactor` function which does wrong calculations for Healtfactor by performing divide operations before multiplication exposing the function and contract to a precision loss vulnerability,which could result to incorrect payouts when users mint DSC leading to loss of funds or insolvency.
 
 ```javascript
 
